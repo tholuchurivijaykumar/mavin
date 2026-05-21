@@ -2,63 +2,65 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "vijay14082003/vijaychowdary"
-        CONTAINER_NAME = "myapp-container"
+        IMAGE = "vijay14082003/vijay"
+        CONTAINER = "devcidoc-container"
+        REPO = "https://github.com/tholuchurivijaykumar/mavin.git"
     }
 
     stages {
 
         stage('Clone') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/tholuchurivijaykumar/mavin.git'
+                git branch: 'main', url: "${REPO}"
             }
         }
 
         stage('Build Maven') {
             steps {
-                sh 'mvn clean package -DskipTests'
+                sh "mvn clean package -DskipTests"
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build Image') {
             steps {
-                sh 'docker build -t $IMAGE_NAME .'
+                sh "ls target"
+                sh "docker build -t ${IMAGE}:latest ."
+                sh "docker images"
             }
         }
 
-        stage('Docker Login') {
+        stage('Login & Push') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'USER',
-                    passwordVariable: 'PASS'
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    sh 'echo $PASS | docker login -u $USER --password-stdin'
+
+                    sh '''
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                        docker push ${IMAGE}:latest
+                    '''
                 }
             }
         }
 
-        stage('Push Image') {
+        stage('Run') {
             steps {
-                sh 'docker push $IMAGE_NAME'
-            }
-        }
-
-        stage('Run Container') {
-            steps {
-                sh 'docker rm -f $CONTAINER_NAME || true'
-                sh 'docker run -d --name $CONTAINER_NAME $IMAGE_NAME'
+                sh '''
+                    docker rm -f ${CONTAINER} || true
+                    docker run -d -P --name ${CONTAINER} ${IMAGE}:latest
+                '''
             }
         }
     }
 
     post {
         success {
-            echo 'CI/CD Pipeline SUCCESS'
+            echo "SUCCESS 🚀"
         }
         failure {
-            echo 'CI/CD Pipeline FAILED'
+            echo "FAILED ❌"
         }
     }
 }
